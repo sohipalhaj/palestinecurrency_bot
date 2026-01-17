@@ -22,7 +22,7 @@ def keep_alive():
     t.start()
 
 # --- 2. إعدادات البوت ---
-TOKEN = "8582182426:AAFcsty3Dy6Dowhrc_J0IRRLxe-ImWyH2Ws"
+TOKEN = "8582182426:AAETFnUCi-e5mBErw_PTjG53T4Np3wxmV6I"
 bot = telebot.TeleBot(TOKEN)
 
 # هوامش الربح
