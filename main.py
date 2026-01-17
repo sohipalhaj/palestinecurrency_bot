@@ -22,7 +22,7 @@ def keep_alive():
     t.start()
 
 # --- 2. إعدادات البوت والذاكرة ---
-TOKEN = "8582182426:AAFs7YFRu4yK5HbIS2eYALuNxoF6mbEnH4Q"
+TOKEN = "8582182426:AAFcsty3Dy6Dowhrc_J0IRRLxe-ImWyH2Ws"
 bot = telebot.TeleBot(TOKEN)
 COMMISSION_PCT = 0.008 
 
