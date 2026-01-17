@@ -11,7 +11,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot V11 (Expanded Layout) is running!"
+    return "Bot V12 is running correctly!"
 
 def run():
     port = int(os.environ.get('PORT', 8080))
@@ -22,15 +22,14 @@ def keep_alive():
     t.start()
 
 # --- 2. إعدادات البوت ---
-# التوكين الجديد الخاص بك
 TOKEN = "8582182426:AAFcsty3Dy6Dowhrc_J0IRRLxe-ImWyH2Ws"
 bot = telebot.TeleBot(TOKEN)
 
-# هامش ربح الصراف (الثابت)
-MARGIN_ILS = 0.10   # 10 أغورات عند التحويل لشيكل
-MARGIN_JOD_USD = 0.005 # هامش بسيط جداً بين الدينار والدولار
+# هوامش الربح
+MARGIN_ILS = 0.10   
+MARGIN_JOD_USD = 0.005 
 
-# ذاكرة التنبيهات (الرادار)
+# ذاكرة الرادار
 user_alerts = {}
 
 # --- 3. جلب البيانات ---
@@ -42,7 +41,6 @@ def get_live_market_data():
         usd_history = hist['Close'].tolist()
         current_usd = usd_history[-1]
         
-        # تثبيت الدينار مقابل الدولار
         PEG_RATE = 1.41 
         current_jod = current_usd * PEG_RATE
         jod_history = [price * PEG_RATE for price in usd_history]
@@ -85,10 +83,10 @@ def monitor_market():
 
 Thread(target=monitor_market).start()
 
-# --- 5. دوال التحليل والرد (النموذج الجديد) ---
+# --- 5. دوال التحليل والرد ---
 
 def calculate_rsi(history):
-    if len(history) < 14: return 50 # محايد
+    if len(history) < 14: return 50
     gains, losses = [], []
     for i in range(1, len(history)):
         delta = history[i] - history[i-1]
@@ -101,99 +99,64 @@ def calculate_rsi(history):
     return 100 - (100 / (1 + rs))
 
 def analyze_conversion(amount, from_curr, to_curr, market_data):
-    # تحديد الأسعار
     rate_from = market_data[from_curr]["current"]
     rate_to = market_data[to_curr]["current"]
     
-    # 1. السعر العالمي (Exchange Rate)
     if from_curr == "ILS": 
-        # تحويل من شيكل لعملة أجنبية (نقسم على سعر العملة)
         exchange_rate = 1 / rate_to
-        # الصراف يبيعك العملة بسعر أغلى (يضيف هامش)
         shop_rate = 1 / (rate_to + MARGIN_ILS) 
     elif to_curr == "ILS": 
-        # تحويل من عملة أجنبية لشيكل (سعر العملة نفسها)
         exchange_rate = rate_from
-        # الصراف يشتري منك بسعر أرخص (يخصم هامش)
         shop_rate = rate_from - MARGIN_ILS
     else: 
-        # بين عملات أجنبية (دينار ودولار)
         exchange_rate = rate_from / rate_to
         shop_rate = exchange_rate - MARGIN_JOD_USD
 
-    # القيم المالية
     global_val = amount * exchange_rate
     net_val = amount * shop_rate
 
-    # تحديد البيانات للتحليل (نحلل العملة الأجنبية مقابل الشيكل دائماً لتحديد الاتجاه)
     if to_curr == "ILS":
-        analyze_curr = from_curr
         hist = market_data[from_curr]["history"]
         current_price_for_analysis = rate_from
     elif from_curr == "ILS":
-        analyze_curr = to_curr
         hist = market_data[to_curr]["history"]
         current_price_for_analysis = rate_to
     else:
-        # حالة خاصة دينار/دولار
-        analyze_curr = to_curr
-        hist = market_data[to_curr]["history"] # تحليل تقريبي
+        hist = market_data[to_curr]["history"]
         current_price_for_analysis = exchange_rate
 
-    # الحسابات الرياضية
     avg_7_days = mean(hist[-7:])
     rsi = calculate_rsi(hist)
 
-    # 5. الاتجاه
     trend_txt = "مستقر نوعاً ما"
     if current_price_for_analysis > avg_7_days: trend_txt = "صعود (ارتفاع)"
     elif current_price_for_analysis < avg_7_days: trend_txt = "هبوط (انخفاض)"
 
-    # 6. التوقعات (بناءً على الزخم)
-    forecast_txt = "السوق متذبذب، الحركة غير واضحة"
+    forecast_txt = "السوق متذبذب"
     if rsi > 70: forecast_txt = "وصل القمة، احتمال يهبط قريباً (تصحيح)"
     elif rsi < 30: forecast_txt = "وصل القاع، احتمال يرتد للصعود"
     elif 50 <= rsi <= 70: forecast_txt = "زخم شرائي، قد يكمل الصعود"
     elif 30 <= rsi < 50: forecast_txt = "زخم بيعي، قد يكمل الهبوط"
 
-    # 8. النصيحة
     advice_txt = "راقب السوق"
-    if to_curr == "ILS": # أنا ببيع عملة أجنبية وبوخذ شيكل
-        if rsi > 60: advice_txt = "السعر ممتاز (غالي)، فرصة مناسبة للبيع والتحويل لشيكل"
-        elif rsi < 40: advice_txt = "السعر منخفض، لا تبيع خسارة، انتظر يرتفع"
+    if to_curr == "ILS": 
+        if rsi > 60: advice_txt = "السعر ممتاز (غالي)، فرصة مناسبة للبيع"
+        elif rsi < 40: advice_txt = "السعر منخفض، لا تبيع خسارة، انتظر"
         else: advice_txt = "السعر متوسط، حول إذا محتاج ضروري فقط"
-    elif from_curr == "ILS": # أنا بشتري عملة أجنبية
-        if rsi < 40: advice_txt = "السعر لقطة (رخيص)، فرصة ممتازة تشتري دولار/دينار"
+    elif from_curr == "ILS": 
+        if rsi < 40: advice_txt = "السعر لقطة (رخيص)، فرصة ممتازة للشراء"
         elif rsi > 60: advice_txt = "السعر غالي، اصبر شوية ممكن يرخص"
         else: advice_txt = "السعر طبيعي، اشتري على دفعات"
 
-    # --- بناء الرسالة (بدون نجوم، مسافات واسعة) ---
     text = f"🔹 التحويل لـ: {market_data[to_curr]['name']}\n\n"
-    
-    text += "1- السعر العالمي للعملة:\n"
-    text += f"{exchange_rate:.4f}\n\n"
-    
-    text += "2- القيمة حسب السعر العالمي:\n"
-    text += f"{global_val:.2f}\n\n"
-    
-    text += "3- سعر الصراف المتوقع (بعد خصم عمولة):\n"
-    text += f"{shop_rate:.4f}\n\n"
-    
-    text += "4- المبلغ الصافي اللي بتقبضه بيدك:\n"
-    text += f"{net_val:.2f}\n\n"
-    
-    text += "5- اتجاه العملة الحالي:\n"
-    text += f"{trend_txt}\n\n"
-    
-    text += "6- التوقعات القريبة:\n"
-    text += f"{forecast_txt}\n\n"
-    
-    text += "7- متوسط السعر (آخر أسبوع):\n"
-    text += f"{avg_7_days:.3f}\n\n"
-    
-    text += "8- النصيحة:\n"
-    text += f"{advice_txt}\n"
-    
+    text += f"1- السعر العالمي للعملة:\n{exchange_rate:.4f}\n\n"
+    text += f"2- القيمة حسب السعر العالمي:\n{global_val:.2f}\n\n"
+    text += f"3- سعر الصراف المتوقع (بعد الخصم):\n{shop_rate:.4f}\n\n"
+    text += f"4- المبلغ الصافي اللي بتقبضه بيدك:\n{net_val:.2f}\n\n"
+    text += f"5- اتجاه العملة الحالي:\n{trend_txt}\n\n"
+    text += f"6- التوقعات القريبة:\n{forecast_txt}\n\n"
+    text += f"7- متوسط السعر (آخر أسبوع):\n{avg_7_days:.3f}\n\n"
+    text += f"8- النصيحة:\n{advice_txt}\n"
     text += "ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ\n\n"
     return text
 
@@ -224,9 +187,43 @@ def handle_message(message):
                 user_alerts[chat_id].append({'coin': coin, 'target': target_price, 'type': typ})
                 
                 bot.reply_to(message, f"تم تفعيل التنبيه على سعر {target_price}")
-        except: bot.reply_to(message, "تأكد من صيغة الأمر")
+        except: 
+            bot.reply_to(message, "تأكد من صيغة الأمر")
         return
 
     # التحويل
     try:
         data = get_live_market_data()
+        if not data:
+            bot.reply_to(message, "فشل جلب البيانات")
+            return
+
+        amount_str = ''.join(filter(lambda x: x.isdigit() or x == '.', text))
+        if not amount_str:
+            bot.reply_to(message, "اكتب المبلغ والعملة")
+            return
+        amount = float(amount_str)
+        
+        curr_code = ""
+        if "دولار" in text: curr_code = "USD"
+        elif "دينار" in text: curr_code = "JOD"
+        elif "شيكل" in text: curr_code = "ILS"
+        else:
+            bot.reply_to(message, "حدد العملة (دولار، دينار، شيكل)")
+            return
+
+        report = f"💰 المبلغ المدخل: {amount} {data[curr_code]['name']}\n"
+        report += "ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ\n\n"
+        
+        targets = [c for c in ["USD", "JOD", "ILS"] if c != curr_code]
+        for target in targets:
+            report += analyze_conversion(amount, curr_code, target, data)
+
+        bot.reply_to(message, report)
+
+    except: 
+        bot.reply_to(message, "حدث خطأ غير متوقع، تأكد من الرقم")
+
+# تشغيل
+keep_alive()
+bot.infinity_polling()
